@@ -17,7 +17,8 @@ class GeneratorInvertedList(object):
 
 
 	def _tokenize_text(self, text):
-		return word_tokenize(unicodedata.normalize('NFKD', text).encode('ascii','ignore').upper().decode('utf-8'))
+		return word_tokenize(unicode(text, errors='replace').upper())
+		#return word_tokenize(unicodedata.normalize('NFKD', text).encode('ascii','ignore').upper().decode('utf-8'))
 
 	def _contains_number(self,token):
 		p = re.compile('\d+')
@@ -91,10 +92,4 @@ l = r.get_paths()
 g = GeneratorInvertedList(l)
 
 g.execute()
-
-
-
-
-
-
 						
