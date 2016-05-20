@@ -1,6 +1,7 @@
 from nltk import word_tokenize
 import re
-import unicodedata
+from unidecode import unidecode
+import codecs
 import reader
 
 
@@ -17,28 +18,19 @@ class GeneratorInvertedList(object):
 
 
 	def _tokenize_text(self, text):
-		return word_tokenize(unicode(text, errors='replace').upper())
-		#return word_tokenize(unicodedata.normalize('NFKD', text).encode('ascii','ignore').upper().decode('utf-8'))
+		return word_tokenize(unidecode(text).upper())
 
-	def _contains_number(self,token):
-		p = re.compile('\d+')
-
-		if p.findall(token) == []:
-			return False
-		else:
-			return True		
-	
 
 	def _remove_stopwords(self,tokens):
 		
 		no_stopwords = []
 
 		for token in tokens:
-			if len(token) > 1 and self._contains_number(token) is False:
+			if len(token) > 1 and token.isalpha():
 				no_stopwords.append(token)
 			else: 
 				pass
-
+		
 		return no_stopwords
 	
 
@@ -55,6 +47,7 @@ class GeneratorInvertedList(object):
 	def _insert_inverted_list(self, document_id, tokens):
 
 		for token in tokens:
+			print(token)
 			if not token in self.inverted_list:
 				self.inverted_list[token] = []
 				#self.terms_number +=  1
@@ -73,17 +66,12 @@ class GeneratorInvertedList(object):
 			# task = file_name[-1]
 
 			print(path)
-			file = open(path, 'r')
-
+			file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
 			content = self._tokenize_text(file.read())
-
-			no_stopwords_content = self._remove_stopwords(content)
-			self._insert_inverted_list(file_name, content)
-
+			vocab = self._remove_stopwords(content)
+			self._insert_inverted_list(file_name, vocab)
 
 
-
-			
 	def execute(self):
 		self._read_files()
 
