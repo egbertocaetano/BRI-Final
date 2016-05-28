@@ -1,83 +1,114 @@
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import pairwise_distances
 from nltk import word_tokenize
 import re
-from unidecode import unidecode
 import codecs
 import reader
+import numpy as np
+
+def score_sim(matriz_queries, matriz_corpus):
+    
+    matriz_similaridade = pairwise_distances(matrix_queries,matrix_corpus, 'cosine', -1)
+    
+    return matriz_similaridade
+
+def ranking(matriz_queries, matriz_corpus):
+    
+    pairwise_results = score_sim(matriz_queries, matriz_corpus)
+    
+    indices = []
+    distancias = []
+    
+    for j in range(len(pairwise_results)):
+
+        indices.append([i[0] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
+        distancias.append([i[1] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
+    
+    return indices, distancias
+
+def metricas(target, ranking_consulta):
+    
+    precisions = np.zeros((target.shape[1]))
+    recalls = np.zeros((target.shape[1]))
+    
+    ks = np.array([i for i in range(target.shape[1])])
+    
+    for i in range(queries_index.shape[0]):# target tem o mesmo tamanho da consulta
+            
+        relevantes = 0
+        retornados = 0
+        
+        consultai = ranking_consulta[i]
+        targeti = target[i]
+        
+        total_relevantes = np.sum(targeti)
+        
+        for j in range(len(consultai)):
+            
+            retornados = j+1
+            
+            pos = consultai[j]
+        
+            if (targeti[0,pos] == 1):
+                relevantes += 1
+                
+            precisions[j] = precisions[j] + relevantes/retornados
+            recalls[j] = recalls[j] + relevantes/total_relevantes
+            
+    precisions = precisions / matriz_queries.shape[0]
+    
+    recalls = recalls / matriz_queries.shape[0]        
+   
+    return precisions, recalls, ks 
+
+def tokenize_text(text):
+	return word_tokenize(text.lower())
 
 
-class GeneratorInvertedList(object):
-
-	def __init__(self, file_list):
-		self.file_list = file_list
-		self.write_path = ""
-		self.read_paths = []
-		self.inverted_list = {}
-		self.document_id = None
-		self.no_stopwords_tokens = []
-		self.inverted_list_csv = None
-
-
-	def _tokenize_text(self, text):
-		return word_tokenize(unidecode(text).upper())
-
-
-	def _remove_stopwords(self,tokens):
-		
-		no_stopwords = []
-
-		for token in tokens:
-			if len(token) > 1 and token.isalpha():
-				no_stopwords.append(token)
-			else: 
-				pass
-		
-		return no_stopwords
+def remove_stopwords(tokens):
 	
+	no_stopwords = []
+	stoplist = set('for a of the and to in'.split())
+	for token in tokens:
+		if len(token) > 1 and token.isalpha() and not token in stoplist:
+			no_stopwords.append(token)
+	
+	return no_stopwords
 
-	def _get_paths(self):
+def mount_vocab(l):
+	queries = []
+	corpus = []
+	id_path = []
+	id_source = []
+	vocab = []
+	for path in l[1:]:
+		file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
+		text = file.read()
+		if path.find("source") == -1:
+			id_path.append(path)
+			vocab += remove_stopwords(tokenize_text(text))
+			queries.append( text.lower() )
+		else:
+			id_source.append(path)
+			vocab += remove_stopwords(tokenize_text(text))
+			corpus.append( text.lower() )
 		
-		for path in self.file_list:
+	vocab = list(set(vocab))
+	
+	return vocab, queries, corpus, id_path, id_source
 
-			splited_path = path[1:].split("/")
-
-			if len(splited_path) > 1:
-				pass
-
-
-	def _insert_inverted_list(self, document_id, tokens):
-
-		for token in tokens:
-			print(token)
-			if not token in self.inverted_list:
-				self.inverted_list[token] = []
-				#self.terms_number +=  1
-			self.inverted_list[token].append(document_id)			
-
-	def _read_files(self):
-
-		for path in self.file_list[1:]:
-
-			splited_path = path[2:].split("/")
-
-			category = splited_path[0] 
-			file_name = splited_path[1][:10]
-			# group = file_name[1:2]
-			# person = file_name[3:4]
-			# task = file_name[-1]
-
-			print(path)
-			file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
-			content = self._tokenize_text(file.read())
-			vocab = self._remove_stopwords(content)
-			self._insert_inverted_list(file_name, vocab)
-
-
-	def execute(self):
-		self._read_files()
+	
 
 r = reader.Reader("data/spa_corpus/corpus-20090418")
 l = r.get_paths()
-g = GeneratorInvertedList(l)
+vocab, queries, corpus, id_path, id_source = mount_vocab(l)
 
-g.execute()
-						
+cv = CountVectorizer(vocabulary = vocab)
+
+matrix_queries = cv.fit_transform(queries).toarray()
+matrix_corpus = cv.fit_transform(corpus).toarray()
+
+indices, distances = ranking(matrix_queries, matrix_corpus)
+
+pos = 23
+print(id_path[var], " - ", id_source[indices[var][0]],id_source[indices[var][1]], id_source[indices[var][2]], id_source[indices[var][3]], id_source[indices[var][4]], " / ", distances[var])
