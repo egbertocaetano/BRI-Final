@@ -145,10 +145,21 @@ def ranking(matriz_queries, matriz_corpus):
     return indices, distancias
 
 
-def metricas(targets, id_queries, id_sources, indices):
+def f1_score(precision, recall):
+    
+    if(precision + recall == 0):
+        return 0
+
+    return 2*((precision*recall)/(precision+recall))
+
+
+def metricas(targets, id_queries, id_sources, indices, distancias):
     
     precisions = np.zeros(len(id_sources))
     recalls = np.zeros(len(id_sources))
+    f1 = np.zeros(len(id_sources))
+    hfm = np.zeros(len(id_queries))
+    separation = np.zeros(len(id_queries))
 
     for i in range(len(id_queries)):
         
@@ -164,17 +175,24 @@ def metricas(targets, id_queries, id_sources, indices):
             
             retornados = j+1
         
-            if (id_sources[ rankingi[j] ] in targeti):
+            if id_sources[ rankingi[j] ] in targeti:
                 relevantes += 1
+                separation[i] = (distancias[i][ rankingi[j] ] * 100. / distancias[i][ rankingi[0] ]) - hfm[i]
+
+            elif hfm[i] == 0:
+                hfm[i] =  distancias[i][ rankingi[j] ] * 100. / distancias[i][ rankingi[0] ]
                 
             precisions[j] = precisions[j] + relevantes/retornados
             recalls[j] = recalls[j] + relevantes/total_relevantes
+            f1[j] = f1[j] + f1_score(precisions[j], recalls[j])
         
-    precisions = precisions / len(id_queries)
-    
-    recalls = recalls / len(id_queries)      
+    precisions /= len(id_queries)
+    recalls /= len(id_queries)  
+    f1 /= len(id_queries)
+
    
-    return precisions, recalls
+    return precisions, recalls, f1, hfm, separation
+
 
 def tokenize_text(text):
     return word_tokenize(text.lower())
@@ -246,9 +264,9 @@ print("Contruindo os vetores de frequencias das palavras do corpus")
 matrix_corpus = cv.fit_transform(corpus)
 
 print("Rankeando as similaridades")
-indices, distances = ranking(matrix_queries, matrix_corpus)
+indices, distancias = ranking(matrix_queries, matrix_corpus)
 
 print("Resultados")
-precisions, recalls = metricas(targets, id_queries, id_sources, indices)
+precisions, recalls, f1, hfm, separation = metricas(targets, id_queries, id_sources, indices, distancias)
 
-print(precisions)
+print(distancias[0][indices[0][0]])
