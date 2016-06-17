@@ -82,16 +82,18 @@ def mount_vocab(l):
 	id_source = []
 	vocab = []
 	for path in l[1:]:
-		file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
-		text = file.read()
-		if path.find("source") == -1:
-			id_path.append(path)
-			vocab += remove_stopwords(tokenize_text(text))
-			queries.append( text.lower() )
-		else:
-			id_source.append(path)
-			vocab += remove_stopwords(tokenize_text(text))
-			corpus.append( text.lower() )
+		if(path[-4:] == ".txt"):
+			
+			file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
+			text = file.read()
+			if path.find("source") == -1:
+				id_path.append(path)
+				vocab += remove_stopwords(tokenize_text(text))
+				queries.append( text.lower() )
+			else:
+				id_source.append(path)
+				vocab += remove_stopwords(tokenize_text(text))
+				corpus.append( text.lower() )
 		
 	vocab = list(set(vocab))
 	
@@ -99,8 +101,9 @@ def mount_vocab(l):
 
 	
 
-r = reader.Reader("data/spa_corpus/corpus-20090418")
+r = reader.Reader("/media/jones/Arquivos/pan-plagiarism-corpus-2011/external-detection-corpus/")
 l = r.get_paths()
+
 vocab, queries, corpus, id_path, id_source = mount_vocab(l)
 
 cv = CountVectorizer(vocabulary = vocab)

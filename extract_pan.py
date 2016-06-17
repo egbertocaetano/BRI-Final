@@ -4,15 +4,14 @@
 # of plagiarised documents are also included in the partition.
 #
 # There are 14,428 total suspicious documents in the test pan-plagiarism-corpus-2009 directory
-
+'''
 import os
 import random
 import xml.etree.ElementTree as ET
 import sys
 
-def main(training_percent = 0.7):
-    random.seed(1337)
-
+def main():
+    
     suspects_base_path = "/home/jones/Documentos/BRI/pan-plagiarism-corpus-2009/external-detection-corpus/suspicious-documents/"
     suspects_dirs = ["part1/", "part2/", "part3/", "part4/", "part5/", "part6/", "part7/", "part8/"]
     sources_base_path = "/home/jones/Documentos/BRI/pan-plagiarism-corpus-2009/external-detection-corpus/source-documents/"
@@ -114,3 +113,142 @@ def main(training_percent = 0.7):
 
 if __name__ == '__main__':
     main()
+
+'''
+
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import pairwise_distances
+import xml.etree.ElementTree as ET
+from nltk import word_tokenize
+import re
+import codecs
+import reader
+import numpy as np
+
+def score_sim(matriz_queries, matriz_corpus):
+    
+    return pairwise_distances(matrix_queries,matrix_corpus, 'cosine', -1)
+    
+
+def ranking(matriz_queries, matriz_corpus):
+    
+    pairwise_results = score_sim(matriz_queries, matriz_corpus)
+    
+    indices = []
+    distancias = []
+    
+    for j in range(len(pairwise_results)):
+
+        indices.append([i[0] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
+        distancias.append([i[1] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
+    
+    return indices, distancias
+
+
+def metricas(targets, id_queries, id_sources, indices):
+    
+    precisions = np.zeros(len(id_sources))
+    recalls = np.zeros(len(id_sources))
+
+    for i in range(len(id_queries)):
+        
+        relevantes = 0
+        retornados = 0
+        
+        rankingi = indices[i]
+        targeti = targets[i]
+        
+        total_relevantes = len(rankingi)
+        
+        for j in range(len(rankingi)):
+            
+            retornados = j+1
+        
+            if (id_sources[ rankingi[j] ] in targeti):
+                relevantes += 1
+                
+            precisions[j] = precisions[j] + relevantes/retornados
+            recalls[j] = recalls[j] + relevantes/total_relevantes
+        
+    precisions = precisions / len(id_queries)
+    
+    recalls = recalls / len(id_queries)      
+   
+    return precisions, recalls
+
+def tokenize_text(text):
+    return word_tokenize(text.lower())
+
+
+def remove_stopwords(tokens):
+    
+    no_stopwords = []
+    stoplist = set('for a of the and to in'.split())
+    for token in tokens:
+        if len(token) > 1 and token.isalpha() and not token in stoplist:
+            no_stopwords.append(token)
+    
+    return no_stopwords
+
+
+def mount_vocab(l):
+    queries = []
+    corpus = []
+    id_queries = []
+    id_sources = []
+    targets = []
+    vocab = []
+    for path in l[1:]:
+        if(path[-4:] == ".txt"):
+           
+            file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
+            text = file.read()
+            if path.find("source") == -1:
+                id_queries.append(path)
+                vocab += remove_stopwords(tokenize_text(text))
+                queries.append( text.lower() )
+
+                tree = ET.parse(path[:-4]+".xml")
+                target_aux = list()
+                for feature in tree.iter("feature"):
+                    if(feature.get("name") == "plagiarism") and feature.get("source_reference") not in target_aux:
+                        target_aux.append(feature.get("source_reference"))
+                targets.append(target_aux)
+            else:
+                id_sources.append(path)
+                vocab += remove_stopwords(tokenize_text(text))
+                corpus.append( text.lower() )
+        '''
+        else:
+            tree = ET.parse(path)
+            for feature in tree.iter("feature"):
+                if(feature.get("name") == "plagiarism"):
+                    print(path, " ", feature.get("source_reference"))
+        '''
+                    
+    vocab = list(set(vocab))
+    
+    return vocab, queries, corpus, id_queries, id_sources, targets
+
+    
+r = reader.Reader("/media/jones/Arquivos/pan-plagiarism-corpus-2011_alterado/external-detection-corpus/")
+l = r.get_paths()
+
+print("Montando vocabulario")
+vocab, queries, corpus, id_queries, id_sources, targets = mount_vocab(l)
+
+cv = CountVectorizer(vocabulary = vocab)
+
+print("Contruindo os vetores de frequencias das palavras das queries")
+matrix_queries = cv.fit_transform(queries)
+
+print("Contruindo os vetores de frequencias das palavras do corpus")
+matrix_corpus = cv.fit_transform(corpus)
+
+print("Rankeando as similaridades")
+indices, distances = ranking(matrix_queries, matrix_corpus)
+
+print("Resultados")
+precisions, recalls = metricas(targets, id_queries, id_sources, indices)
+
+print(precisions)
