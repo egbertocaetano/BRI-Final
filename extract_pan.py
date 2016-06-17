@@ -222,7 +222,7 @@ def mount_vocab(l):
             file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
             text = file.read()
             if path.find("source") == -1:
-                id_queries.append(path)
+                id_queries.append(path.split("/")[-1])
                 vocab += remove_stopwords(tokenize_text(text))
                 queries.append( text.lower() )
 
@@ -232,18 +232,12 @@ def mount_vocab(l):
                     if(feature.get("name") == "plagiarism") and feature.get("source_reference") not in target_aux:
                         target_aux.append(feature.get("source_reference"))
                 targets.append(target_aux)
+
             else:
-                id_sources.append(path)
+                id_sources.append(path.split("/")[-1])
                 vocab += remove_stopwords(tokenize_text(text))
                 corpus.append( text.lower() )
-        '''
-        else:
-            tree = ET.parse(path)
-            for feature in tree.iter("feature"):
-                if(feature.get("name") == "plagiarism"):
-                    print(path, " ", feature.get("source_reference"))
-        '''
-                    
+                            
     vocab = list(set(vocab))
     
     return vocab, queries, corpus, id_queries, id_sources, targets
