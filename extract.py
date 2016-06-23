@@ -124,6 +124,7 @@ import re
 import codecs
 import reader
 import numpy as np
+import pickle
 
 def score_sim(matriz_queries, matriz_corpus):
     
@@ -136,13 +137,13 @@ def ranking(matriz_queries, matriz_corpus):
     
     indices = []
     distancias = []
-    
+
     for j in range(len(pairwise_results)):
 
         indices.append([i[0] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
         distancias.append([i[1] for i in sorted(enumerate(pairwise_results[j]), key=lambda x:x[1])])
     
-    return indices, distancias
+    return np.array(indices), np.array(distancias)
 
 
 def f1_score(precision, recall):
@@ -153,15 +154,15 @@ def f1_score(precision, recall):
     return 2*((precision*recall)/(precision+recall))
 
 
-def metricas(targets, id_queries, id_sources, indices, distancias):
+def metricas(targets, id_sources, indices, distancias):
     
-    precisions = np.zeros(len(id_sources))
-    recalls = np.zeros(len(id_sources))
-    f1 = np.zeros(len(id_sources))
-    hfm = np.zeros(len(id_queries))
-    separation = np.zeros(len(id_queries))
+    precisions = np.zeros(indices.shape[1])
+    recalls = np.zeros(indices.shape[1])
+    f1 = np.zeros(indices.shape[1])
+    hfm = np.zeros(len(targets))
+    separation = np.zeros(len(targets))
 
-    for i in range(len(id_queries)):
+    for i in range(len(targets)):
         
         relevantes = 0
         retornados = 0
@@ -175,20 +176,20 @@ def metricas(targets, id_queries, id_sources, indices, distancias):
             
             retornados = j+1
         
-            if id_sources[ rankingi[j] ] in targeti:
+            if rankingi[j] in targeti:
                 relevantes += 1
-                separation[i] = (distancias[i][ rankingi[j] ] * 100. / distancias[i][ rankingi[0] ]) - hfm[i]
+                separation[i] = (distancias[i][j] * 100. / distancias[i][0]) - hfm[i]
 
             elif hfm[i] == 0:
-                hfm[i] =  distancias[i][ rankingi[j] ] * 100. / distancias[i][ rankingi[0] ]
+                hfm[i] = distancias[i][j] * 100. / distancias[i][0]
                 
             precisions[j] = precisions[j] + relevantes/retornados
             recalls[j] = recalls[j] + relevantes/total_relevantes
             f1[j] = f1[j] + f1_score(precisions[j], recalls[j])
         
-    precisions /= len(id_queries)
-    recalls /= len(id_queries)  
-    f1 /= len(id_queries)
+    precisions /= len(targets)
+    recalls /= len(targets)  
+    f1 /= len(targets)
 
    
     return precisions, recalls, f1, hfm, separation
@@ -209,59 +210,89 @@ def remove_stopwords(tokens):
     return no_stopwords
 
 
-def mount_vocab(l):
-    queries = []
-    corpus = []
-    id_queries = []
-    id_sources = []
-    targets = []
+def mount_vocab_source(l):
     vocab = []
+    corpus = []
+    id_sources = {}
+    i = 0
+
+    for path in l[1:]:
+        if(path[-4:] == ".txt"):
+            
+            file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
+            text = file.read()
+
+            vocab += remove_stopwords(tokenize_text(text))                
+            vocab = list(set(vocab))
+            id_sources[path.split("/")[-1]] = i
+            corpus.append( text.lower() )
+            i += 1
+    
+    
+    return vocab, corpus, id_sources
+
+
+def mount_vocab_querie(l, id_sources):
+    vocab = []
+    queries = []
+    targets = []
+    
     for path in l[1:]:
         if(path[-4:] == ".txt"):
            
             file = codecs.open(path, "r", encoding='utf-8', errors='ignore')
             text = file.read()
-            if path.find("source") == -1:
-                id_queries.append(path.split("/")[-1])
-                vocab += remove_stopwords(tokenize_text(text))
-                queries.append( text.lower() )
+        
+            vocab += remove_stopwords(tokenize_text(text))                
+            vocab = list(set(vocab))
+            queries.append( text.lower() )
 
-                tree = ET.parse(path[:-4]+".xml")
-                target_aux = list()
-                for feature in tree.iter("feature"):
-                    if(feature.get("name") == "plagiarism") and feature.get("source_reference") not in target_aux:
-                        target_aux.append(feature.get("source_reference"))
-                targets.append(target_aux)
-
-            else:
-                id_sources.append(path.split("/")[-1])
-                vocab += remove_stopwords(tokenize_text(text))
-                corpus.append( text.lower() )
-                            
-    vocab = list(set(vocab))
+            tree = ET.parse(path[:-4]+".xml")
+            target_aux = list()
+            for feature in tree.iter("feature"):
+                if(feature.get("name") == "plagiarism") and feature.get("source_reference") in id_sources and id_sources[feature.get("source_reference")] not in target_aux:
+                    target_aux.append(id_sources[feature.get("source_reference")])
+            targets.append(target_aux)
     
-    return vocab, queries, corpus, id_queries, id_sources, targets
+    
+    return vocab, queries, targets
 
     
-r = reader.Reader("/home/jones/external-detection-corpus/")
+r = reader.Reader("/home/jones/external-detection-corpus/source-document/")
 l = r.get_paths()
 
-print("Montando vocabulario")
-vocab, queries, corpus, id_queries, id_sources, targets = mount_vocab(l)
+print("Montando vocabulario source")
+vocab_source, corpus, id_sources = mount_vocab_source(l)
+
+r = reader.Reader("/home/jones/external-detection-corpus/suspicious-document/")
+l = r.get_paths()
+
+print("Montando vocabulario querie")
+vocab_queries, queries, targets = mount_vocab_querie(l, id_sources)
+
+vocab = list(set(vocab_queries + vocab_source))
+
+pickle.dump(vocab, open("/home/jones/vocab.txt", "wb"))
+pickle.dump(corpus, open("/home/jones/sources.txt", "wb"))
+pickle.dump(queries, open("/home/jones/queries.txt", "wb"))
+pickle.dump(id_sources, open("/home/jones/id_sources.txt", "wb"))
+pickle.dump(targets, open("/home/jones/targets.txt", "wb"))
 
 cv = CountVectorizer(vocabulary = vocab)
 
+del vocab_queries, vocab_source, vocab, r, l
+
 print("Contruindo os vetores de frequencias das palavras das queries")
-matrix_queries = cv.fit_transform(queries)
+matrix_queries = cv.fit_transform(queries).toarray()
 
 print("Contruindo os vetores de frequencias das palavras do corpus")
-matrix_corpus = cv.fit_transform(corpus)
+matrix_corpus = cv.fit_transform(corpus).toarray()
 
 print("Rankeando as similaridades")
 indices, distancias = ranking(matrix_queries, matrix_corpus)
 
 print("Resultados")
-precisions, recalls, f1, hfm, separation = metricas(targets, id_queries, id_sources, indices, distancias)
+precisions, recalls, f1, hfm, separation = metricas(targets, id_sources, indices, distancias)
 
 pickle.dump(precisions, open("/home/jones/resultados/precisions_bow.txt", "wb"))
 pickle.dump(recalls, open("/home/jones/resultados/recalls_bow.txt", "wb"))
