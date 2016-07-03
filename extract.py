@@ -236,7 +236,7 @@ def mount_vocab_querie(l, id_sources):
     vocab = []
     queries = []
     targets = []
-    
+
     for path in l[1:]:
         if(path[-4:] == ".txt"):
            
@@ -247,14 +247,15 @@ def mount_vocab_querie(l, id_sources):
             vocab = list(set(vocab))
             queries.append( text.lower() )
 
+            target = zeros(len(id_sources))
             tree = ET.parse(path[:-4]+".xml")
             target_aux = list()
             for feature in tree.iter("feature"):
                 if(feature.get("name") == "plagiarism") and feature.get("source_reference") in id_sources and id_sources[feature.get("source_reference")] not in target_aux:
-                    target_aux.append(id_sources[feature.get("source_reference")])
-            targets.append(target_aux)
-    
-    
+                    target[id_sources[feature.get("source_reference")]] = 1
+
+            targets.append(target)
+
     return vocab, queries, targets
 
     
