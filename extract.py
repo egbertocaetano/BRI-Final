@@ -176,7 +176,7 @@ def metricas(targets, id_sources, indices, distancias):
             
             retornados = j+1
         
-            if rankingi[j] in targeti:
+            if targeti[rankingi[j]] == 1:
                 relevantes += 1
                 separation[i] = (distancias[i][j] * 100. / distancias[i][0]) - hfm[i]
 
@@ -284,10 +284,10 @@ cv = CountVectorizer(vocabulary = vocab)
 del vocab_queries, vocab_source, vocab, r, l
 
 print("Contruindo os vetores de frequencias das palavras das queries")
-matrix_queries = cv.fit_transform(queries).toarray()
+matrix_queries = cv.fit_transform(queries)
 
 print("Contruindo os vetores de frequencias das palavras do corpus")
-matrix_corpus = cv.fit_transform(corpus).toarray()
+matrix_corpus = cv.fit_transform(corpus)
 
 print("Rankeando as similaridades")
 indices, distancias = ranking(matrix_queries, matrix_corpus)

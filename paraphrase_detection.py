@@ -26,7 +26,9 @@ from sklearn.linear_model.logistic import LogisticRegression
 from scipy.sparse.lil import lil_matrix
 #from duartefellipe.datasets.extractors.P4P_extractor import extract_p4p_to_ranking_task
 import re
-#from duartefellipe.config import datasets_extractors, STANFORD_PARSER
+from config import STANFORD_PARSER
+from activation_functions import Tanh
+from word_embedding_transformers import ACL2010WordEmbedding
 from nltk.corpus import wordnet as wn, wordnet_ic
 
 
@@ -139,6 +141,29 @@ def load_short_plagiarized_answers_as_pairs():
     
     return (np.array(dataset_documents), np.array(dataset_target)==1, 0, 0)
     
+
+def load_pan_plagiarism_corpus_2011():
+    
+    queries, corpus_index, target = extract_pan()
+    
+    dataset_documents = []
+    dataset_target = []
+    
+    replace_fun = lambda x: x.replace(" '","").replace("' ","").replace(" `","").replace("` ","").replace(" \"","").replace("\" ","").replace("´´","").replace("``","").replace('\n','').replace('\\','')
+
+    for i in range(len(queries)):
+        for j in range(len(corpus_index)):
+            dataset_documents.append((
+                                      replace_fun(encoding_sanitization(queries[i])),
+                                      replace_fun(encoding_sanitization(corpus_index[j]))
+                                      ))
+            dataset_target.append(target[i][j])
+
+    del queries, corpus_index, target
+    
+    return (np.array(dataset_documents), np.array(dataset_target)==1, 0, 0)
+    
+
 def load_meter_as_pairs(leave_out = None):
     '''
          123820 court pairs + 8100 showbiz pairs = 131920 pairs to eval
@@ -269,7 +294,7 @@ def _tree_to_matrix(tree_to_parse):
 
 class SentenceTreeTokenizer(BaseEstimator, VectorizerMixin):
     
-    def __init__(self,parser_model_path="/stanford-parser/englishPCFG.ser.gz", parser_path_to_jar='/stanford-parser/stanford-parser.jar', parser_path_to_models_jar='/stanford-parser/stanford-parser-3.5.2-models.jar', log_steps = False):
+    def __init__(self,parser_model_path="../stanford-parser/englishPCFG.ser.gz", parser_path_to_jar="../stanford-parser/stanford-parser.jar", parser_path_to_models_jar="../stanford-parser/stanford-parser-3.5.2-models.jar", log_steps = False):
         self.parser_model_path, self.parser_path_to_jar, self.parser_path_to_models_jar, self.log_steps = parser_model_path, parser_path_to_jar, parser_path_to_models_jar, log_steps 
         self.parser = st.StanfordParser(
             model_path = self.parser_model_path, 
@@ -321,7 +346,7 @@ class SentenceTreeTokenizer(BaseEstimator, VectorizerMixin):
       
 class SentenceDeepRecursiveAutoEncoder(BaseEstimator, VectorizerMixin):
     
-    def __init__(self,word_embeddings_path,unfold = False, n = 3, hidden_units = 200,eta = 0.01,reg_rate = 0.00001, epochs = 10, error_threshold = 0.001, activation_function = None, debug = False, log_steps = False):
+    def __init__(self,word_embeddings_path,unfold = False, n = 3, hidden_units = 200,eta = 0.01,reg_rate = 0.00001, epochs = 10, error_threshold = 0.001, activation_function = Tanh(), debug = False, log_steps = False):
         self.word_embeddings_path,self.unfold,self.n,self.hidden_units, self.eta,self.reg_rate, self.epochs,self.error_threshold, self.debug, self.log_steps = (word_embeddings_path, unfold, n,hidden_units, eta, reg_rate, epochs, error_threshold, debug, log_steps)
         self.activation_function = activation_function
         
@@ -546,7 +571,7 @@ class SentenceDeepRecursiveAutoEncoder(BaseEstimator, VectorizerMixin):
 
 class TreeDeepRecursiveAutoEncoder(BaseEstimator, VectorizerMixin):
     
-    def __init__(self,word_embeddings_path,unfold = False, n = 3, hidden_units = 200,eta = 0.01,reg_rate = 0.00001, epochs = 10, error_threshold=0.001, activation_function = None, debug = False, log_steps = False):
+    def __init__(self,word_embeddings_path,unfold = False, n = 3, hidden_units = 200,eta = 0.01,reg_rate = 0.00001, epochs = 10, error_threshold=0.001, activation_function = Tanh(), debug = False, log_steps = False):
         self.word_embeddings_path,self.unfold,self.n,self.hidden_units, self.eta,self.reg_rate, self.epochs, self.error_threshold, self.debug, self.log_steps = (word_embeddings_path, unfold, n,hidden_units, eta, reg_rate, epochs, error_threshold, debug, log_steps)
         self.activation_function = activation_function
         
@@ -614,12 +639,12 @@ if __name__ == '__main__':
     print('all_texts,all_target : ',len(all_texts),len(all_target))
     
 #   word_embeddings_path = "/home/fellipe/Documents/Datasets/NerACL2010_Experiments/Data/WordEmbedding/"
-    word_embeddings_path = "/home/jones/Documentos/BRI/WordEmbedding"
+    word_embeddings_path = "/home/jones/Documents/BRI/WordEmbedding/"
     
     pipeline = Pipeline([
                     ("DatasetFlattener",DatasetFlattener()),
-                    ("Tokenizer",SentenceTreeTokenizer(n_jobs = 4, log_steps = True)),
-                    ("RAE",TreeDeepRecursiveAutoEncoder(word_embeddings_path, unfold = False, n = 25,hidden_units=2000,epochs=20,eta = 0.015,log_steps=True)),
+                    ("Tokenizer",SentenceTreeTokenizer(log_steps = True)),
+                    ("RAE",TreeDeepRecursiveAutoEncoder(word_embeddings_path, unfold = False, n = 25,hidden_units=2000,epochs=20,eta = 0.015,log_steps=True))
                     #("flatten-to-pairs",SentenceTreeFlattentoPairs()),
                     #("Pooling",SentenceTreeDistancesPooling(resultant_matrix_size = 2 ,log_steps=True)),
                     #("MinSelector",PooledDistancesKMinSelector(log_steps=False)),
