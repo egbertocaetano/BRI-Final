@@ -47,12 +47,10 @@ def metricas(targets, indices):
         
     selectivitys /= len(targets_dense)
     
-    recall = recalls[:, [0, 50, 100, 213, 427, 641, 855]]
-
-    print(np.mean(recall, axis=0))
-    print(np.std(recall, axis=0))
-    exit()
-    return recalls, selectivitys
+    recall = np.mean(recalls[:, [0, 50, 100, 213, 427, 641, 855]], axis=0)
+    
+    selectivitys = [0, 50, 100, 213, 427, 641, 855]
+    return recall, selectivitys
 
 '''
 all_texts = pickle.load(open("/home/forrest/workspace/BRI/Final Work/final/resultados/at.txt", "rb"))
@@ -89,6 +87,7 @@ for i in range(1, 2*tam_corpus, 2):
     for sentence in ft[i]:
         root_sentences_docs.append(sentence[2][0])#conjunto de todos os vetores raizes de todas as sentencas
         mapa[len(root_sentences_docs) - 1 ] = count#mapeando cada vetor raiz com seu documento respectivo
+
     count += 1
 
 for i in range(0, 2*tam_queries, 2):
@@ -102,24 +101,29 @@ for i in range(0, 2*tam_queries, 2):
 docs_results = [0.0]*tam_queries*tam_corpus
 docs_results = np.array(docs_results).reshape(tam_queries, tam_corpus)
 
-
-nbrs = NearestNeighbors(n_neighbors=5, algorithm='brute', metric='euclidean').fit(root_sentences_docs)
-
+nbrs = NearestNeighbors(n_neighbors=50, algorithm='brute', metric='euclidean').fit(root_sentences_docs)
+k = 5
 for i in queries_indices:
     
     sentences = root_sentences_queries[i]
 
     distances, indices = nbrs.kneighbors(sentences)
 
+    a = set()
     for j, queries_i in enumerate(indices):
-        for l, k in enumerate(queries_i):
-            docs_results[i][mapa[k]] += 1
-
-
+        for l, m in enumerate(queries_i):
+            a.add(mapa[m])
+            if len(a) > k:
+                break
+            docs_results[i][mapa[m]] += 1
+            
+        if len(a) > k:
+            break
 
 #targets_dense = targets.todense()
 #pprint(docs_results[10])
 #pprint(np.nonzero(docs_results[657]))
+
 indices, distances = ranking(docs_results)
 recall, selectivity = metricas(targets, indices)
 
