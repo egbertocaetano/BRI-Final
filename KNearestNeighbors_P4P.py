@@ -22,13 +22,9 @@ def metricas(targets, indices):
     
     indices = np.array(indices)
 
-
-
     recalls = np.zeros(targets.shape)
-    selectivitys = np.zeros(indices.shape[1])
     targets_dense = targets.todense()
   	
-
     for i in range(len(targets_dense)):
         relevantes = 0
 
@@ -38,19 +34,18 @@ def metricas(targets, indices):
         targeti = np.transpose(targets_dense[i])
         total_relevantes = np.sum(targeti)
 
-        for j in rankingi:
-            if (targeti[j] == 1):
+        for j in range(len(rankingi)):
+            if (targeti[rankingi[j]] == 1):
                # print("relevante", targeti[j])
                 
                 relevantes += 1
 
-            recalls[i, j] += relevantes / total_relevantes
-            selectivitys[j] += (j+1) / indices.shape[1]
+            recalls[i, j] = relevantes / total_relevantes
         
-    selectivitys /= len(targets_dense)
     #print(np.transpose(np.nonzero(1-recalls)))
     #print(recalls[0,: 15])
     #print(recalls[9,: 15])
+    #print(recalls)
     recall = np.mean(recalls[:, [10, 50, 100, 213, 427, 641, 855]], axis=0)
     recall_std = np.std(recalls[:, [10, 50, 100, 213, 427, 641, 855]], axis=0)
     selectivitys = [10, 50, 100, 213, 427, 641, 855]
@@ -84,10 +79,11 @@ print("All:", len(all_texts))
 print("Queries:", tam_queries)
 print("ft:", ft.shape)
 print("target:", targets.shape)
+print("\n-----------------------------------------------------------------------------------")
 
 queries_indices = np.nonzero(targets.sum(axis=1))[0]
 targets = targets[queries_indices, :]
-print(targets.shape)
+#print(targets.shape)
 for i in range(1, 2*tam_corpus, 2):
     l = []
     for sentence in ft[i]:
@@ -106,7 +102,7 @@ for i in range(0, 2*tam_queries, 2):
 
 docs_results = [0.0]*tam_corpus*tam_queries
 docs_results = np.array(docs_results).reshape(tam_queries, tam_corpus)
-print(docs_results.shape)
+#print(docs_results.shape)
 k = 50
 '''
 brute = NearestNeighbors(n_neighbors=50, algorithm='brute', metric='euclidean').fit(root_sentences_docs)
@@ -186,14 +182,24 @@ for algorithm_name,alg_decorator in [("kd_tree","-*"),("ball_tree","-^"),("brute
     indices, distances = ranking(docs_results_1)
     
     del docs_results_1
-    print(algorithm_name ,"in %4.4f seconds | %4.4f seconds"%(alg_time,np.sum(np.array(ret_time))) )
+    print("Algorithm - ", algorithm_name ," : construction time in %4.4f seconds | %4.4f retrievel time seconds"%(alg_time,np.sum(np.array(ret_time))) )
     recall, recall_std, selectivity = metricas(targets, indices)
+
+    print("Recall : ", recall)
+    print("Variância : ", recall_std)
+    print("Selectivity : ", selectivity)
+    print("\n-----------------------------------------------------------------------------------")
+
+    title_graphic = algorithm_name + "_n=100_unfold=True"
 
 
     ax.errorbar(selectivity, recall, yerr=recall_std, fmt=alg_decorator)
     ax.set_title(algorithm_name)
 
 
+    path = "/home/forrest/workspace/BRI/Final Work/final/image/short_"+title_graphic
+    plt.savefig(path)
+    
     #plt.plot(selectivity, recall, marker='o')
 
-plt.show()
+#plt.show()
